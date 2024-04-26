@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package register;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service Register {
+    // Draft
+    rpc NewDraft(Draft) returns (RecordID);
+    rpc UpdateDraft(Draft) returns (google.protobuf.Empty);
+    rpc DeleteDraft(RecordID) returns (google.protobuf.Empty);
+
+    // Promote a Draft as a regular request. Can't be deleted after.
+    rpc SubmitDraft(RecordID) returns (google.protobuf.Empty);
+
+    // Collect
+    rpc CollectClientInside(TimestampTrace) returns (google.protobuf.Empty);
+    rpc CollectClientSignature(SignerTrace) returns (google.protobuf.Empty);
+    rpc CollectClientOutside(TimestampTrace) returns (google.protobuf.Empty);
+    rpc CollectPqrsSignature(SignerTrace) returns (google.protobuf.Empty);
+
+    // Return
+    rpc ReturnClientInside(TimestampTrace) returns (google.protobuf.Empty);
+    rpc ReturnClientSignature(SignerTrace) returns (google.protobuf.Empty);
+    rpc ReturnClientOutside(TimestampTrace) returns (google.protobuf.Empty);
+    rpc ReturnPqrsSignature(SignerTrace) returns (google.protobuf.Empty);
+
+    // Tag a request as completed. No update can be done after.
+    rpc Complete(RecordID) returns (google.protobuf.Empty);
+
+    // Search
+    rpc Search(SearchRequest) returns (stream Record); // Search entries by time range and state
+    rpc SearchById(RecordID) returns (Record); // Search by id
+
+    // Watch
+    // rpc WatchRecords(SearchRequest) returns (stream Record); // Watch events that occured to selected records
+}
+
+message Draft {
+    string id = 1;
+    string summary = 2;
+}
+
+message RecordID {
+    string id = 1;
+}
+
+message TimestampTrace {
+    string id = 1;
+    google.protobuf.Timestamp time = 2;
+}
+
+message Signer {
+    string name = 1;
+    string signature = 2;
+}
+
+message SignerTrace {
+    string id = 1;
+    Signer signer = 2;
+}
+
+message Trace {
+    optional google.protobuf.Timestamp inside = 1;
+    optional google.protobuf.Timestamp outside = 2;
+    optional Signer client = 3;
+    optional Signer pqrs = 4;
+}
+
+message Traces {
+    optional Trace collected = 1;
+    optional Trace returned = 2;
+}
+
+enum RecordState {
+    UNSPECIFIED = 0;
+    DRAFT = 1;
+    CREATED = 2;
+    COLLECT_CLIENT_INSIDE = 3;
+    COLLECT_CLIENT_SIGNATURE = 4;
+    COLLECT_CLIENT_OUTSIDE = 5;
+    COLLECT_PQRS_SIGNATURE = 6;
+    RETURN_CLIENT_INSIDE = 7;
+    RETURN_CLIENT_SIGNATURE = 8;
+    RETURN_CLIENT_OUTSIDE = 9;
+    RETURN_PQRS_SIGNATURE = 10;
+    COMPLETED = 11;
+}
+
+message Record {
+    string id = 1;
+    int32 api_version = 2;
+    string summary = 3;
+    optional google.protobuf.Timestamp created = 4;
+    optional Traces traces = 5;
+    RecordState state = 6;
+}
+
+message TimestampRange {
+    google.protobuf.Timestamp begin = 1;
+    optional google.protobuf.Timestamp end = 2;
+}
+
+message SearchRequest {
+    repeated RecordState states = 1;
+    optional TimestampRange range = 2;
+}
