@@ -34,7 +34,7 @@ service Register {
     rpc SearchById(RecordID) returns (Record); // Search by id
 
     // Watch
-    // rpc WatchRecords(SearchRequest) returns (stream Record); // Watch events that occured to selected records
+    rpc Watch(google.protobuf.Empty) returns (stream RecordEvent); // Watch events (added, modified, deleted records)
 }
 
 message Draft {
@@ -105,4 +105,16 @@ message TimestampRange {
 message SearchRequest {
     repeated RecordState states = 1;
     optional TimestampRange range = 2;
+}
+
+enum EventType {
+    EMPTY_EVENT = 0;
+    ADDED = 1;
+    MODIFIED = 2;
+    DELETED = 3;
+}
+
+message RecordEvent {
+    EventType event_type = 1;
+    Record record = 2;
 }

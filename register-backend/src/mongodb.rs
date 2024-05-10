@@ -7,7 +7,11 @@ pub use self::string_id::StringId;
 pub use self::traces_for::{SignatureTraceFor, TimeTraceFor};
 
 use std::env;
+use std::time::Duration;
 
+use mongodb::change_stream::event::ChangeStreamEvent;
+use mongodb::change_stream::ChangeStream;
+use mongodb::options::{ChangeStreamOptions, FullDocumentType};
 use mongodb::Cursor;
 use mongodb::{
     bson::{doc, to_bson},
@@ -229,6 +233,19 @@ impl Mongo {
             .update_one(query, update, None)
             .await
             .and_then(Mongo::error_on_update_unmatched)
+    }
+
+    pub async fn watch() -> Result<ChangeStream<ChangeStreamEvent<Record>>, Error> {
+        let db = Mongo::init().await?;
+
+        // max_await_time will have an impact on next_if_any.
+        // be careful as this time will impact when a stream/connection will be closed when a client request is closed.
+        let options = ChangeStreamOptions::builder()
+            .full_document(Some(FullDocumentType::UpdateLookup))
+            .max_await_time(Some(Duration::from_secs(5)))
+            .build();
+
+        db.register.watch(None, Some(options)).await
     }
 
     pub async fn search_by_id(id: StringId) -> Result<Option<Record>, Error> {

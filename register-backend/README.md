@@ -53,4 +53,7 @@ grpcurl -proto ../proto/register.proto -d '{"id": "'$ID'"}' -plaintext 127.0.0.1
 
 # Search all records with a specific state (eg: COMPLETED state)
 grpcurl -proto ../proto/register.proto -d '{"states": ["COMPLETED"]}' -plaintext 127.0.0.1:50051 register.Register/Search
+
+# Watch all events in the register
+grpcurl -proto ../proto/register.proto -d '{}' -plaintext 127.0.0.1:50051 register.Register/Watch
 ```

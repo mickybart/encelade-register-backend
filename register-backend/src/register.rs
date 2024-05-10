@@ -1,6 +1,9 @@
 pub use internal::register_server::RegisterServer;
 
-use internal::{Draft, Record, RecordId, SearchRequest, SignerTrace, TimestampTrace, Traces};
+use internal::{
+    Draft, Record, RecordEvent, RecordId, SearchRequest, SignerTrace, TimestampTrace, Traces, EventType,
+};
+use mongodb::change_stream::event::OperationType;
 use num_traits::FromPrimitive;
 use prost_types::Timestamp;
 use tokio::sync::mpsc;
@@ -121,6 +124,75 @@ impl internal::register_server::Register for Register {
             .await
             .map(|_| Register::empty_response())
             .map_err(|e| Status::aborted(e.to_string()))
+    }
+
+    type WatchStream = ReceiverStream<Result<RecordEvent, Status>>;
+
+    async fn watch(&self, _request: Request<()>) -> Result<Response<Self::WatchStream>, Status> {
+        let mut change_stream = db::Mongo::watch()
+            .await
+            .map_err(|e| Status::aborted(e.to_string()))?;
+
+        let (tx, rx) = mpsc::channel::<Result<RecordEvent, Status>>(10);
+
+        // ready to spawn
+        tokio::spawn(async move {
+            // loop if the stream is alive or the tx is not closed due to a request ended by the client (rx side)
+            while change_stream.is_alive() && !tx.is_closed() {
+                if let Some(change_stream_event) = change_stream.next_if_any().await.transpose() {
+                    let event = match change_stream_event {
+                        Ok(change_stream_event) => match change_stream_event.operation_type {
+                            OperationType::Invalidate => Err(Status::cancelled(
+                                "A global issue with the collection occurs on the database side",
+                            )),
+                            OperationType::Insert => Ok(RecordEvent {
+                                event_type: EventType::Added as i32,
+                                record: change_stream_event.full_document.map(|doc| doc.into()),
+                            }),
+                            OperationType::Update => Ok(RecordEvent {
+                                event_type: EventType::Modified as i32,
+                                record: change_stream_event.full_document.map(|doc| doc.into()),
+                            }),
+                            OperationType::Delete => {
+                                let doc = change_stream_event.document_key;
+                                let id = doc.map_or_else(
+                                    || "".to_owned(),
+                                    |doc| {
+                                        doc.get_object_id("_id")
+                                            .map_or_else(|_| "".to_owned(), |id| id.to_string())
+                                    },
+                                );
+
+                                let record = Some(Record {
+                                    id,
+                                    api_version: 0,
+                                    summary: "".to_owned(),
+                                    created: None,
+                                    traces: None,
+                                    state: 0,
+                                });
+
+                                Ok(RecordEvent {
+                                    event_type: EventType::Deleted as i32,
+                                    record,
+                                })
+                            }
+                            _ => continue, // skip all other events
+                        },
+                        Err(e) => Err(Status::aborted(e.to_string())),
+                    };
+
+                    if let Err(_) = tx.send(event).await {
+                        // TODO: logging error
+                        return;
+                    }
+                }
+            }
+
+            // watch end due to tx.send error or rx closed by client side or db stream closed
+        });
+
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     type SearchStream = ReceiverStream<Result<Record, Status>>;
