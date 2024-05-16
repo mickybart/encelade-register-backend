@@ -9,6 +9,7 @@ pub use self::traces_for::{SignatureTraceFor, TimeTraceFor};
 use std::env;
 use std::time::Duration;
 
+use chrono::Utc;
 use mongodb::change_stream::event::ChangeStreamEvent;
 use mongodb::change_stream::ChangeStream;
 use mongodb::options::{ChangeStreamOptions, FullDocumentType};
@@ -50,7 +51,7 @@ impl Mongo {
         let draft = Record {
             id: None,
             api_version: API_VERSION_1,
-            created: None,
+            created: Some(Utc::now().timestamp()),
             summary: summary,
             traces: None,
             state: RecordState::Draft,
@@ -98,7 +99,7 @@ impl Mongo {
         };
         let update = doc! {
             "$set": {
-                "created": Some(0), // TODO: use current date
+                "created": Some(Utc::now().timestamp()),
                 "state": RecordState::Created,
             }
         };
@@ -258,11 +259,23 @@ impl Mongo {
         db.register.find_one(filter, None).await
     }
 
-    pub async fn search(states: Vec<RecordState>) -> Result<Cursor<Record>, Error> {
+    pub async fn search(
+        states: Vec<RecordState>,
+        range: Option<(i64, i64)>,
+    ) -> Result<Cursor<Record>, Error> {
         let db = Mongo::init().await?;
 
-        let filter = doc! {
-            "state": { "$in": states }
+        let filter = match range {
+            None => doc! {
+                "state": { "$in": states }
+            },
+            Some(range) => doc! {
+                "$and" : vec![
+                    doc! {"state": { "$in": states }},
+                    doc! {"created": { "$gte": range.0 }},
+                    doc! {"created": { "$lte": range.1 }},
+                ]
+            },
         };
 
         db.register.find(filter, None).await

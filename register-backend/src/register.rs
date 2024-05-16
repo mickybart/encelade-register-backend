@@ -1,7 +1,9 @@
+use chrono::Utc;
 pub use internal::register_server::RegisterServer;
 
 use internal::{
-    Draft, Record, RecordEvent, RecordId, SearchRequest, SignerTrace, TimestampTrace, Traces, EventType,
+    Draft, EventType, Record, RecordEvent, RecordId, SearchRequest, SignerTrace, TimestampTrace,
+    Traces,
 };
 use mongodb::change_stream::event::OperationType;
 use num_traits::FromPrimitive;
@@ -209,7 +211,23 @@ impl internal::register_server::Register for Register {
             .map(|i| FromPrimitive::from_i32(i.to_owned()).unwrap_or(db::RecordState::Unspecified))
             .collect();
 
-        let mut cursor = db::Mongo::search(states)
+        let range = request.range.map(|range| {
+            let mut rangefilter = (0,0);
+
+            if let Some(begin) = range.begin {
+                rangefilter.0 = begin.seconds;
+                rangefilter.1 = match range.end {
+                    Some(end) => end.seconds,
+                    None => Utc::now().timestamp(),
+                };
+
+                Some(rangefilter)
+            } else {
+                None
+            }
+        }).flatten();
+
+        let mut cursor = db::Mongo::search(states, range)
             .await
             .map_err(|e| Status::aborted(e.to_string()))?;
 
