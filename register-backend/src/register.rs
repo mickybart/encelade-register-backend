@@ -26,6 +26,8 @@ impl internal::register_server::Register for Register {
     async fn new_draft(&self, request: Request<Draft>) -> Result<Response<RecordId>, Status> {
         let request = request.into_inner();
 
+        tracing::info!("new draft request");
+
         db::Mongo::insert_draft(request.summary)
             .await
             .map(|result| {
@@ -39,6 +41,8 @@ impl internal::register_server::Register for Register {
     async fn update_draft(&self, request: Request<Draft>) -> Result<Response<()>, Status> {
         let request = request.into_inner();
 
+        tracing::info!("update draft request for {}", request.id);
+
         db::Mongo::update_draft(db::StringId(request.id), request.summary)
             .await
             .map(|_| Register::empty_response())
@@ -48,6 +52,8 @@ impl internal::register_server::Register for Register {
     async fn delete_draft(&self, request: Request<RecordId>) -> Result<Response<()>, Status> {
         let request = request.into_inner();
 
+        tracing::info!("delete draft request for {}", request.id);
+
         db::Mongo::delete_draft(db::StringId(request.id))
             .await
             .map(|_| Register::empty_response())
@@ -56,6 +62,8 @@ impl internal::register_server::Register for Register {
 
     async fn submit_draft(&self, request: Request<RecordId>) -> Result<Response<()>, Status> {
         let request = request.into_inner();
+
+        tracing::info!("submit draft request for {}", request.id);
 
         db::Mongo::submit_draft(db::StringId(request.id))
             .await
@@ -122,6 +130,8 @@ impl internal::register_server::Register for Register {
     async fn complete(&self, request: Request<RecordId>) -> Result<Response<()>, Status> {
         let request = request.into_inner();
 
+        tracing::info!("complete request for {}", request.id);
+
         db::Mongo::completed(db::StringId(request.id))
             .await
             .map(|_| Register::empty_response())
@@ -131,6 +141,8 @@ impl internal::register_server::Register for Register {
     type WatchStream = ReceiverStream<Result<RecordEvent, Status>>;
 
     async fn watch(&self, _request: Request<()>) -> Result<Response<Self::WatchStream>, Status> {
+        tracing::info!("watch request");
+
         let mut change_stream = db::Mongo::watch()
             .await
             .map_err(|e| Status::aborted(e.to_string()))?;
@@ -185,13 +197,14 @@ impl internal::register_server::Register for Register {
                     };
 
                     if let Err(_) = tx.send(event).await {
-                        // TODO: logging error
+                        tracing::info!("watch closed by client");
                         return;
                     }
                 }
             }
 
             // watch end due to tx.send error or rx closed by client side or db stream closed
+            tracing::debug!("watch closed");
         });
 
         Ok(Response::new(ReceiverStream::new(rx)))
@@ -203,6 +216,8 @@ impl internal::register_server::Register for Register {
         &self,
         request: Request<SearchRequest>,
     ) -> Result<Response<Self::SearchStream>, Status> {
+        tracing::info!("search request");
+
         let request = request.into_inner();
 
         let states = request
@@ -240,10 +255,12 @@ impl internal::register_server::Register for Register {
                     .map_err(|e| Status::aborted(e.to_string()));
 
                 if let Err(_) = tx.send(doc).await {
-                    // TODO: logging error
+                    tracing::info!("search closed by client");
                     return;
                 }
             }
+
+            tracing::debug!("search closed");
         });
 
         Ok(Response::new(ReceiverStream::new(rx)))
@@ -251,6 +268,8 @@ impl internal::register_server::Register for Register {
 
     async fn search_by_id(&self, request: Request<RecordId>) -> Result<Response<Record>, Status> {
         let request = request.into_inner();
+
+        tracing::info!("search request for {}", request.id);
 
         db::Mongo::search_by_id(db::StringId(request.id))
             .await
@@ -283,6 +302,8 @@ impl Register {
     ) -> Result<Response<()>, Status> {
         let request = request.into_inner();
 
+        tracing::info!("trace request for {}", request.id);
+
         let time = request.time.map_or(0, |time| time.seconds);
 
         db::Mongo::client_time_trace(db::StringId(request.id), time, target)
@@ -296,6 +317,8 @@ impl Register {
         target: db::SignatureTraceFor,
     ) -> Result<Response<()>, Status> {
         let request = request.into_inner();
+
+        tracing::info!("sign request for {}", request.id);
 
         let signer = request
             .signer
