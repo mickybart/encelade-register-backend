@@ -6,15 +6,20 @@ use std::error::Error;
 use register::{Register, RegisterServer};
 use tonic::transport::Server;
 
+use crate::config::AppConfig;
+
 mod register;
 mod mongodb;
 mod observability;
+mod config;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     observability::init_tracing();
 
-    let addr = "0.0.0.0:50051".parse()?;
+    let app_config = AppConfig::build()?;
+
+    let addr = app_config.listen.grpc.parse()?;
     let register_service = Register::default();
 
     tracing::info!("listening on {}", addr);
