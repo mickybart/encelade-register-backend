@@ -9,7 +9,7 @@ extern crate num_derive;
 use std::error::Error;
 
 use register::{Register, RegisterServer};
-use tonic::transport::Server;
+use tonic::transport::{Identity, Server, ServerTlsConfig};
 
 use crate::config::AppConfig;
 
@@ -29,11 +29,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     tracing::info!("listening on {}", addr);
 
-    Server::builder()
-        .accept_http1(true)
-        .add_service(tonic_web::enable(register_server))
-        .serve(addr)
-        .await?;
+    if app_config.tls {
+        let cert = tokio::fs::read("config/server.crt").await?;
+        let key = tokio::fs::read("config/server.key").await?;
+        let identity = Identity::from_pem(cert, key);
+
+        tracing::info!("tls enabled");
+
+        Server::builder()
+            .tls_config(ServerTlsConfig::new().identity(identity))?
+            .add_service(tonic_web::enable(register_server))
+            .serve(addr)
+            .await?;
+    } else {
+        Server::builder()
+            .accept_http1(true)
+            .add_service(tonic_web::enable(register_server))
+            .serve(addr)
+            .await?;
+    }
 
     Ok(())
 }

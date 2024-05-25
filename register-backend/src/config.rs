@@ -11,10 +11,12 @@ use serde::Deserialize;
 ///
 /// ```yaml
 /// listen: 'IP:PORT'
+/// tls: # true or false
 /// ```
 #[derive(Deserialize)]
 pub(crate) struct AppConfig {
     pub(crate) listen: String,
+    pub(crate) tls: bool,
 }
 
 impl AppConfig {
