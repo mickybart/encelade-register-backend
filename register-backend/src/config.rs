@@ -5,12 +5,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub(crate) struct AppConfig {
-    pub(crate) listen: Listen,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Listen {
-    pub(crate) grpc: String,
+    pub(crate) listen: String,
 }
 
 impl AppConfig {

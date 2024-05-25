@@ -8,24 +8,25 @@ use tonic::transport::Server;
 
 use crate::config::AppConfig;
 
-mod register;
+mod config;
 mod mongodb;
 mod observability;
-mod config;
+mod register;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     observability::init_tracing();
 
-    let app_config = AppConfig::build()?;
+    let app_config: AppConfig = AppConfig::build()?;
 
-    let addr = app_config.listen.grpc.parse()?;
-    let register_service = Register::default();
+    let addr = app_config.listen.parse()?;
+    let register_server = RegisterServer::new(Register::default());
 
     tracing::info!("listening on {}", addr);
 
     Server::builder()
-        .add_service(RegisterServer::new(register_service))
+        .accept_http1(true)
+        .add_service(tonic_web::enable(register_server))
         .serve(addr)
         .await?;
 
