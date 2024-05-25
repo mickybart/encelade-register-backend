@@ -26,32 +26,32 @@ impl From<RecordState> for Bson {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Signer {
-    pub name: String,
-    pub signature: String,
+pub(crate) struct Signer {
+    pub(crate) name: String,
+    pub(crate) signature: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Trace {
-    pub inside: Option<i64>,
-    pub outside: Option<i64>,
-    pub client: Option<Signer>,
-    pub pqrs: Option<Signer>,
+pub(crate) struct Trace {
+    pub(crate) inside: Option<i64>,
+    pub(crate) outside: Option<i64>,
+    pub(crate) client: Option<Signer>,
+    pub(crate) pqrs: Option<Signer>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Traces {
-    pub collected: Option<Trace>,
-    pub returned: Option<Trace>,
+pub(crate) struct Traces {
+    pub(crate) collected: Option<Trace>,
+    pub(crate) returned: Option<Trace>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Record {
+pub(crate) struct Record {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
-    pub id: Option<ObjectId>,
-    pub api_version: i32,
-    pub created: Option<i64>,
-    pub summary: String,
-    pub traces: Option<Traces>,
-    pub state: RecordState,
+    pub(crate) id: Option<ObjectId>,
+    pub(crate) api_version: i32,
+    pub(crate) created: Option<i64>,
+    pub(crate) summary: String,
+    pub(crate) traces: Option<Traces>,
+    pub(crate) state: RecordState,
 }

@@ -1,3 +1,8 @@
+#![warn(missing_docs, rust_2018_idioms, unreachable_pub)]
+#![forbid(unsafe_code)]
+
+//! Register Service exposed by grpc and grpc-web
+
 #[macro_use]
 extern crate num_derive;
 

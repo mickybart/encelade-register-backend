@@ -1,10 +1,12 @@
+//! MongoDB abstraction for Register collection
+
 mod register_types;
 mod string_id;
 mod traces_for;
 
-pub use self::register_types::{Record, RecordState, Signer, Trace};
-pub use self::string_id::StringId;
-pub use self::traces_for::{SignatureTraceFor, TimeTraceFor};
+pub(crate) use self::register_types::{Record, RecordState, Signer, Trace};
+pub(crate) use self::string_id::StringId;
+pub(crate) use self::traces_for::{SignatureTraceFor, TimeTraceFor};
 
 use std::env;
 use std::time::Duration;
@@ -22,8 +24,9 @@ use mongodb::{
     Client, Collection,
 };
 
-pub struct Mongo {
-    pub register: Collection<Record>,
+/// A MongoDB Collection of [Record] type
+pub(crate) struct Mongo {
+    pub(crate) register: Collection<Record>,
 }
 
 static API_VERSION_1: i32 = 1;
@@ -31,7 +34,7 @@ static DATABASE_NAME: &'static str = "encelade";
 static COLLECTION_NAME: &'static str = "register";
 
 impl Mongo {
-    pub async fn init() -> Result<Self, Error> {
+    pub(crate) async fn init() -> Result<Self, Error> {
         let uri = env::var("MONGODB_URI").map_err(|_| {
             Error::custom("Backend is not ready as MONGODB_URI environment variable is unset !")
         })?;
@@ -45,7 +48,7 @@ impl Mongo {
         Ok(Mongo { register })
     }
 
-    pub async fn insert_draft(summary: String) -> Result<InsertOneResult, Error> {
+    pub(crate) async fn insert_draft(summary: String) -> Result<InsertOneResult, Error> {
         let db = Mongo::init().await?;
 
         let draft = Record {
@@ -60,7 +63,7 @@ impl Mongo {
         db.register.insert_one(draft, None).await
     }
 
-    pub async fn update_draft(id: StringId, summary: String) -> Result<UpdateResult, Error> {
+    pub(crate) async fn update_draft(id: StringId, summary: String) -> Result<UpdateResult, Error> {
         let db = Mongo::init().await?;
 
         let query = doc! {
@@ -79,7 +82,7 @@ impl Mongo {
             .and_then(Mongo::error_on_update_unmatched)
     }
 
-    pub async fn delete_draft(id: StringId) -> Result<DeleteResult, Error> {
+    pub(crate) async fn delete_draft(id: StringId) -> Result<DeleteResult, Error> {
         let db = Mongo::init().await?;
 
         let query = doc! {
@@ -90,7 +93,7 @@ impl Mongo {
         db.register.delete_one(query, None).await
     }
 
-    pub async fn submit_draft(id: StringId) -> Result<UpdateResult, Error> {
+    pub(crate) async fn submit_draft(id: StringId) -> Result<UpdateResult, Error> {
         let db = Mongo::init().await?;
 
         let query = doc! {
@@ -110,7 +113,7 @@ impl Mongo {
             .and_then(Mongo::error_on_update_unmatched)
     }
 
-    pub async fn client_time_trace(
+    pub(crate) async fn client_time_trace(
         id: StringId,
         time: i64,
         target: TimeTraceFor,
@@ -165,7 +168,7 @@ impl Mongo {
             .and_then(Mongo::error_on_update_unmatched)
     }
 
-    pub async fn signature_trace(
+    pub(crate) async fn signature_trace(
         id: StringId,
         signer: Signer,
         target: SignatureTraceFor,
@@ -217,7 +220,7 @@ impl Mongo {
             .and_then(Mongo::error_on_update_unmatched)
     }
 
-    pub async fn completed(id: StringId) -> Result<UpdateResult, Error> {
+    pub(crate) async fn completed(id: StringId) -> Result<UpdateResult, Error> {
         let db = Mongo::init().await?;
 
         let query = doc! {
@@ -236,7 +239,7 @@ impl Mongo {
             .and_then(Mongo::error_on_update_unmatched)
     }
 
-    pub async fn watch() -> Result<ChangeStream<ChangeStreamEvent<Record>>, Error> {
+    pub(crate) async fn watch() -> Result<ChangeStream<ChangeStreamEvent<Record>>, Error> {
         let db = Mongo::init().await?;
 
         // max_await_time will have an impact on next_if_any.
@@ -249,7 +252,7 @@ impl Mongo {
         db.register.watch(None, Some(options)).await
     }
 
-    pub async fn search_by_id(id: StringId) -> Result<Option<Record>, Error> {
+    pub(crate) async fn search_by_id(id: StringId) -> Result<Option<Record>, Error> {
         let db = Mongo::init().await?;
 
         let filter = doc! {
@@ -259,7 +262,7 @@ impl Mongo {
         db.register.find_one(filter, None).await
     }
 
-    pub async fn search(
+    pub(crate) async fn search(
         states: Vec<RecordState>,
         range: Option<(i64, i64)>,
     ) -> Result<Cursor<Record>, Error> {

@@ -1,5 +1,7 @@
+//! Register Service (proto)
+
 use chrono::Utc;
-pub use internal::register_server::RegisterServer;
+pub(crate) use internal::register_server::RegisterServer;
 
 use internal::{
     Draft, EventType, Record, RecordEvent, RecordId, SearchRequest, SignerTrace, TimestampTrace,
@@ -14,12 +16,13 @@ use tonic::{Request, Response, Status};
 
 use crate::mongodb as db;
 
+#[allow(unreachable_pub)]
 mod internal {
     tonic::include_proto!("register");
 }
 
 #[derive(Debug, Default)]
-pub struct Register {}
+pub(crate) struct Register {}
 
 #[tonic::async_trait]
 impl internal::register_server::Register for Register {

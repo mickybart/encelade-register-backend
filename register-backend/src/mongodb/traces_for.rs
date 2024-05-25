@@ -1,11 +1,11 @@
-pub enum TimeTraceFor {
+pub(crate) enum TimeTraceFor {
     ClientInsideForCollect,
     ClientOutsideAfterCollect,
     ClientInsideForReturn,
     ClientOutsideAfterReturn,
 }
 
-pub enum SignatureTraceFor {
+pub(crate) enum SignatureTraceFor {
     CollectByClient,
     CollectConfirmedByPqrs,
     ReturnByClient,
