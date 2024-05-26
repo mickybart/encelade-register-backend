@@ -1,2 +1,7 @@
-listen: '0.0.0.0:50051'
-tls: false
+service:
+  listen: '0.0.0.0:50051'
+  tls: false
+mongodb:
+  #uri: ''
+  db: 'encelade'
+  collection: 'register'

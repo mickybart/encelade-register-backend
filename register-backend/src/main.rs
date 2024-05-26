@@ -24,12 +24,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let app_config: AppConfig = AppConfig::build()?;
 
-    let addr = app_config.listen.parse()?;
-    let register_server = RegisterServer::new(Register::default());
+    let addr = app_config.service.listen.parse()?;
+    let register_server = RegisterServer::new(Register::new(app_config.mongodb).await?);
 
     tracing::info!("listening on {}", addr);
 
-    if app_config.tls {
+    if app_config.service.tls {
         let cert = tokio::fs::read("config/server.crt").await?;
         let key = tokio::fs::read("config/server.key").await?;
         let identity = Identity::from_pem(cert, key);

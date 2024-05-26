@@ -14,15 +14,16 @@ use tokio::sync::mpsc;
 use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 use tonic::{Request, Response, Status};
 
-use crate::mongodb as db;
+use crate::{config::MongoDbConfig, mongodb as db};
 
 #[allow(unreachable_pub)]
 mod internal {
     tonic::include_proto!("register");
 }
 
-#[derive(Debug, Default)]
-pub(crate) struct Register {}
+pub(crate) struct Register {
+    db: db::Mongo,
+}
 
 #[tonic::async_trait]
 impl internal::register_server::Register for Register {
@@ -31,7 +32,8 @@ impl internal::register_server::Register for Register {
 
         tracing::info!("new draft request");
 
-        db::Mongo::insert_draft(request.summary)
+        self.db
+            .insert_draft(request.summary)
             .await
             .map(|result| {
                 Response::new(RecordId {
@@ -46,7 +48,8 @@ impl internal::register_server::Register for Register {
 
         tracing::info!("update draft request for {}", request.id);
 
-        db::Mongo::update_draft(db::StringId(request.id), request.summary)
+        self.db
+            .update_draft(db::StringId(request.id), request.summary)
             .await
             .map(|_| Register::empty_response())
             .map_err(|e| Status::aborted(e.to_string()))
@@ -57,7 +60,8 @@ impl internal::register_server::Register for Register {
 
         tracing::info!("delete draft request for {}", request.id);
 
-        db::Mongo::delete_draft(db::StringId(request.id))
+        self.db
+            .delete_draft(db::StringId(request.id))
             .await
             .map(|_| Register::empty_response())
             .map_err(|e| Status::aborted(e.to_string()))
@@ -68,7 +72,8 @@ impl internal::register_server::Register for Register {
 
         tracing::info!("submit draft request for {}", request.id);
 
-        db::Mongo::submit_draft(db::StringId(request.id))
+        self.db
+            .submit_draft(db::StringId(request.id))
             .await
             .map(|_| Register::empty_response())
             .map_err(|e| Status::aborted(e.to_string()))
@@ -78,56 +83,64 @@ impl internal::register_server::Register for Register {
         &self,
         request: Request<TimestampTrace>,
     ) -> Result<Response<()>, Status> {
-        Register::client_time_trace(request, db::TimeTraceFor::ClientInsideForCollect).await
+        self.client_time_trace(request, db::TimeTraceFor::ClientInsideForCollect)
+            .await
     }
 
     async fn collect_client_signature(
         &self,
         request: Request<SignerTrace>,
     ) -> Result<Response<()>, Status> {
-        Register::signature_trace(request, db::SignatureTraceFor::CollectByClient).await
+        self.signature_trace(request, db::SignatureTraceFor::CollectByClient)
+            .await
     }
 
     async fn collect_client_outside(
         &self,
         request: Request<TimestampTrace>,
     ) -> Result<Response<()>, Status> {
-        Register::client_time_trace(request, db::TimeTraceFor::ClientOutsideAfterCollect).await
+        self.client_time_trace(request, db::TimeTraceFor::ClientOutsideAfterCollect)
+            .await
     }
 
     async fn collect_pqrs_signature(
         &self,
         request: Request<SignerTrace>,
     ) -> Result<Response<()>, Status> {
-        Register::signature_trace(request, db::SignatureTraceFor::CollectConfirmedByPqrs).await
+        self.signature_trace(request, db::SignatureTraceFor::CollectConfirmedByPqrs)
+            .await
     }
 
     async fn return_client_inside(
         &self,
         request: Request<TimestampTrace>,
     ) -> Result<Response<()>, Status> {
-        Register::client_time_trace(request, db::TimeTraceFor::ClientInsideForReturn).await
+        self.client_time_trace(request, db::TimeTraceFor::ClientInsideForReturn)
+            .await
     }
 
     async fn return_client_signature(
         &self,
         request: Request<SignerTrace>,
     ) -> Result<Response<()>, Status> {
-        Register::signature_trace(request, db::SignatureTraceFor::ReturnByClient).await
+        self.signature_trace(request, db::SignatureTraceFor::ReturnByClient)
+            .await
     }
 
     async fn return_client_outside(
         &self,
         request: Request<TimestampTrace>,
     ) -> Result<Response<()>, Status> {
-        Register::client_time_trace(request, db::TimeTraceFor::ClientOutsideAfterReturn).await
+        self.client_time_trace(request, db::TimeTraceFor::ClientOutsideAfterReturn)
+            .await
     }
 
     async fn return_pqrs_signature(
         &self,
         request: Request<SignerTrace>,
     ) -> Result<Response<()>, Status> {
-        Register::signature_trace(request, db::SignatureTraceFor::ReturnConfirmedByPqrs).await
+        self.signature_trace(request, db::SignatureTraceFor::ReturnConfirmedByPqrs)
+            .await
     }
 
     async fn complete(&self, request: Request<RecordId>) -> Result<Response<()>, Status> {
@@ -135,7 +148,8 @@ impl internal::register_server::Register for Register {
 
         tracing::info!("complete request for {}", request.id);
 
-        db::Mongo::completed(db::StringId(request.id))
+        self.db
+            .completed(db::StringId(request.id))
             .await
             .map(|_| Register::empty_response())
             .map_err(|e| Status::aborted(e.to_string()))
@@ -146,7 +160,9 @@ impl internal::register_server::Register for Register {
     async fn watch(&self, _request: Request<()>) -> Result<Response<Self::WatchStream>, Status> {
         tracing::info!("watch request");
 
-        let mut change_stream = db::Mongo::watch()
+        let mut change_stream = self
+            .db
+            .watch()
             .await
             .map_err(|e| Status::aborted(e.to_string()))?;
 
@@ -229,23 +245,28 @@ impl internal::register_server::Register for Register {
             .map(|i| FromPrimitive::from_i32(i.to_owned()).unwrap_or(db::RecordState::Unspecified))
             .collect();
 
-        let range = request.range.map(|range| {
-            let mut rangefilter = (0,0);
+        let range = request
+            .range
+            .map(|range| {
+                let mut rangefilter = (0, 0);
 
-            if let Some(begin) = range.begin {
-                rangefilter.0 = begin.seconds;
-                rangefilter.1 = match range.end {
-                    Some(end) => end.seconds,
-                    None => Utc::now().timestamp(),
-                };
+                if let Some(begin) = range.begin {
+                    rangefilter.0 = begin.seconds;
+                    rangefilter.1 = match range.end {
+                        Some(end) => end.seconds,
+                        None => Utc::now().timestamp(),
+                    };
 
-                Some(rangefilter)
-            } else {
-                None
-            }
-        }).flatten();
+                    Some(rangefilter)
+                } else {
+                    None
+                }
+            })
+            .flatten();
 
-        let mut cursor = db::Mongo::search(states, range)
+        let mut cursor = self
+            .db
+            .search(states, range)
             .await
             .map_err(|e| Status::aborted(e.to_string()))?;
 
@@ -274,7 +295,8 @@ impl internal::register_server::Register for Register {
 
         tracing::info!("search request for {}", request.id);
 
-        db::Mongo::search_by_id(db::StringId(request.id))
+        self.db
+            .search_by_id(db::StringId(request.id))
             .await
             .map(|result| {
                 Response::new(result.map_or(
@@ -295,11 +317,18 @@ impl internal::register_server::Register for Register {
 }
 
 impl Register {
+    pub(crate) async fn new(config: MongoDbConfig) -> Result<Self, mongodb::error::Error> {
+        Ok(Self {
+            db: db::Mongo::new(config).await?,
+        })
+    }
+
     fn empty_response() -> Response<()> {
         Response::new(())
     }
 
     async fn client_time_trace(
+        &self,
         request: Request<TimestampTrace>,
         target: db::TimeTraceFor,
     ) -> Result<Response<()>, Status> {
@@ -309,13 +338,15 @@ impl Register {
 
         let time = request.time.map_or(0, |time| time.seconds);
 
-        db::Mongo::client_time_trace(db::StringId(request.id), time, target)
+        self.db
+            .client_time_trace(db::StringId(request.id), time, target)
             .await
             .map(|_| Register::empty_response())
             .map_err(|e| Status::aborted(e.to_string()))
     }
 
     async fn signature_trace(
+        &self,
         request: Request<SignerTrace>,
         target: db::SignatureTraceFor,
     ) -> Result<Response<()>, Status> {
@@ -332,7 +363,8 @@ impl Register {
             signature: signer.signature,
         };
 
-        db::Mongo::signature_trace(db::StringId(request.id), signer, target)
+        self.db
+            .signature_trace(db::StringId(request.id), signer, target)
             .await
             .map(|_| Register::empty_response())
             .map_err(|e| Status::aborted(e.to_string()))

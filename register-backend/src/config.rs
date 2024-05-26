@@ -10,13 +10,31 @@ use serde::Deserialize;
 /// Configuration structure file expected:
 ///
 /// ```yaml
-/// listen: 'IP:PORT'
-/// tls: # true or false
+/// service:
+///     listen: 'IP:PORT'
+///     tls: # true or false
+/// mongodb:
+///     uri: 'CONNECTION STRING'
+///     db: 'DATABASE NAME'
+///     collection: 'COLLECTION NAME'
 /// ```
 #[derive(Deserialize)]
 pub(crate) struct AppConfig {
+    pub(crate) service: ServiceConfig,
+    pub(crate) mongodb: MongoDbConfig,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct ServiceConfig {
     pub(crate) listen: String,
     pub(crate) tls: bool,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct MongoDbConfig {
+    pub(crate) uri: String,
+    pub(crate) db: String,
+    pub(crate) collection: String,
 }
 
 impl AppConfig {
