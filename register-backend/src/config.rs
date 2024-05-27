@@ -11,13 +11,25 @@ use serde::Deserialize;
 ///
 /// ```yaml
 /// service:
-///     listen: 'IP:PORT'
-///     tls: # true or false
-///     tokens: # list of token or null. for demonstration purpose only !
+///     # ip:port binding
+///     listen: '127.0.0.1:50051'
+/// 
+///     # enable or disable tls
+///     # if enabled, needs server.crt and server.key files
+///     tls: false
+/// 
+///     # list of token. for demonstration purpose only !
+///     # auth is dicabled if list is null or empty
+///     tokens: []
 /// mongodb:
-///     uri: 'CONNECTION STRING'
-///     db: 'DATABASE NAME'
-///     collection: 'COLLECTION NAME'
+///     # Mongodb uri with options
+///     uri: 'mongodb://user:password@127.0.0.1:27017/'
+/// 
+///     # database name
+///     db: 'encelade'
+/// 
+///     # collection name
+///     collection: 'register'
 /// ```
 #[derive(Deserialize)]
 pub(crate) struct AppConfig {
