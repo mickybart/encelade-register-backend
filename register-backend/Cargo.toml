@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 chrono = "0.4.38"
 config = "0.14.0"
+http = "0.2.12" # https://github.com/hyperium/tonic/issues/1636
 mongodb = "2.8.2"
 num-derive = "0.4.2"
 num-traits = "0.2.18"
@@ -19,6 +20,7 @@ tokio = { version = "1.37.0", features = ["macros", "rt-multi-thread", "fs"] }
 tokio-stream = "0.1.15"
 tonic = { version = "0.11.0", features = ["tls"] }
 tonic-web = "0.11.0"
+tower-http = { version = "0.4.4", features = ["cors"] } # https://github.com/hyperium/tonic/issues/1636
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 

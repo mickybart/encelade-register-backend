@@ -13,6 +13,7 @@ use serde::Deserialize;
 /// service:
 ///     listen: 'IP:PORT'
 ///     tls: # true or false
+///     tokens: # list of token or null. for demonstration purpose only !
 /// mongodb:
 ///     uri: 'CONNECTION STRING'
 ///     db: 'DATABASE NAME'
@@ -28,6 +29,7 @@ pub(crate) struct AppConfig {
 pub(crate) struct ServiceConfig {
     pub(crate) listen: String,
     pub(crate) tls: bool,
+    pub(crate) tokens: Option<Vec<String>>,
 }
 
 #[derive(Deserialize)]
