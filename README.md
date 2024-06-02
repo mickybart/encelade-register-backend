@@ -1,5 +1,7 @@
 # Encelade Suite - Register backend
 
+![encelade illustration](docs/encelade.png) Register backend implementing [register.proto](proto/register.proto).
+
 ## Development
 
 ### Setup
