@@ -1,7 +1,7 @@
 //! Service
-//! 
+//!
 //! Build and run the service
-//! 
+//!
 //! Support:
 //! - Cors
 //! - Auth (POC)
@@ -11,6 +11,7 @@
 use std::{error::Error, sync::Arc, time::Duration};
 
 use http::{HeaderName, Method};
+use tokio::signal;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::{Any, CorsLayer};
@@ -49,7 +50,7 @@ pub(crate) async fn run() -> Result<(), Box<dyn Error>> {
             .layer(cors_layer())
             .layer(GrpcWebLayer::new())
             .add_service(service)
-            .serve(addr)
+            .serve_with_shutdown(addr, shutdown_signal())
             .await?;
     } else {
         Server::builder()
@@ -57,11 +58,35 @@ pub(crate) async fn run() -> Result<(), Box<dyn Error>> {
             .layer(cors_layer())
             .layer(GrpcWebLayer::new())
             .add_service(service)
-            .serve(addr)
+            .serve_with_shutdown(addr, shutdown_signal())
             .await?;
     }
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 const DEFAULT_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
