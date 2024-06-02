@@ -26,3 +26,8 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [build-dependencies]
 tonic-build = "0.11.0"
+
+[profile.release]
+opt-level = "s"
+strip = true
+# panic = 'abort'
