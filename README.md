@@ -41,9 +41,73 @@ EOF
 docker run -it --rm -v $(pwd)/config/demo.yaml:/config/local.yaml -p 50051:50051 encelade-suite-register-backend:latest
 ```
 
+#### TLS
+
+If tls is enabled, `config/server.key` and `config/server.crt` files will be required.
+
+##### Create your own certificates
+
+```bash
+# eg with your own root ca
+
+cd config
+cat << EOF > server.v3.ext
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = localhost
+IP.1 = 127.0.0.1
+IP.2 = 10.0.2.2
+IP.3 = 172.17.0.1
+EOF
+
+# generate root CA
+openssl genrsa -out ca.key 4096
+openssl req -x509 -new -nodes -key ca.key -days 1826 -out ca.crt -subj '/CN=Encelade Suite Root CA/C=CA/ST=Quebec/L=Montreal/O=Pygoscelis'
+
+# trust your root CA
+sudo trust anchor --store ca.crt
+
+# generate server.key and server.crt signed by your root CA
+openssl req -new -nodes -out server.csr -newkey rsa:4096 -keyout server.key -subj '/CN=Encelade Register Backend/C=CA/ST=Quebec/L=Montreal/O=Pygoscelis'
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 730 -sha256 -extfile server.v3.ext
+
+# to untrust your root CA
+# sudo trust anchor --remove ca.crt
+```
+
+##### Configure tls
+
+Update `service.tls` key from your config file:
+
+```yaml
+service:
+  tls: true
+```
+
+Once your service is started, you should see a log line:
+
+```bash
+use tls: true
+```
+
+##### Illegal SNI
+
+This project is using rustls which will not be able to do the handshake if the SNI hostname is an IP. This is not an issue with rustls but with the client itself. If the client is not able to handle the SNI properly, please use an hostname/fqdn instead of an IP and update **alt_names** in `server.v3.ext` file.
+
+Log example:
+
+```bash
+2024-06-10T00:15:46.363931Z  WARN rustls::msgs::handshake: Illegal SNI hostname received "127.0.0.1"
+```
+
 ## Usage
 
 ### grpcurl
+
+*NOTE: remove `-plaintext` argument in below commands if tls is enabled.*
 
 ```bash
 # Information about server grpc proto

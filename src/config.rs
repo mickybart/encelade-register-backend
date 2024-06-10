@@ -19,7 +19,7 @@ use serde::Deserialize;
 ///     tls: false
 /// 
 ///     # list of token. for demonstration purpose only !
-///     # auth is dicabled if list is null or empty
+///     # auth is disabled if list is null or empty
 ///     tokens: []
 /// mongodb:
 ///     # Mongodb uri with options
